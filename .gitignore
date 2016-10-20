@@ -1,3 +1,4 @@
 data/
 temp/
 *.pyc
+.ipynb_checkpoints

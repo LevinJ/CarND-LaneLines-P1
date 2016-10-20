@@ -16,9 +16,8 @@ class Houghline(CannyEdge):
         ignore_mask_color = 255   
         
         #this time we are defining a four sided polygon to mask
-        imshape = edges.shape
 #         vertices = np.array([[(0,imshape[0]),(0, 0), (imshape[1], 0), (imshape[1],imshape[0])]], dtype=np.int32)
-        vertices = np.array([[(10,539),(460,300), (480,300), (930,539)]], dtype=np.int32)
+        vertices = np.array([[(10,539),(460,290), (480,290), (930,539)]], dtype=np.int32)
         cv2.fillPoly(mask, vertices, ignore_mask_color)
         masked_edges = cv2.bitwise_and(edges, mask)
         return masked_edges

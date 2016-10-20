@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
+import cv2
 
 from detectbycolor import DetectByColor
 
@@ -29,10 +30,23 @@ class DetectByColorRegion(DetectByColor):
         region_select[~region_thresholds] = [0,0,0]
         
         return region_select
+    def draw_meshgrid(self, image):
+        x_size = image.shape[1]
+        y_size = image.shape[0]
+        top_xs = np.arange(0, x_size)
+        top_ys = np.zeros(x_size).astype(np.uint8)
+        bottom_xs = np.arange(0, x_size)
+        bottom_ys = np.zeros(x_size).astype(np.uint8)
+        bottom_ys.fill(y_size-1)
+        
+        for i in range(x_size):
+            cv2.line(image, (top_xs[i], top_ys[i]), (bottom_xs[i], bottom_ys[i]), (255,0,0))
+        return image
     def run(self):
         image = self.load_image()
         color_select = self.threshold_by_color(image)
         region_slect = self.threshold_by_region(color_select)
+        region_slect = self.draw_meshgrid(region_slect)
         # Display the image                 
         plt.imshow(region_slect)
         plt.show()

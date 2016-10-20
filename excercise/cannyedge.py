@@ -37,6 +37,7 @@ class CannyEdge:
     def run(self):
         image = self.load_image()
         gray = self.gray_scale(image)
+        plt.imshow(gray, cmap='gray')
         edges = self.canny(gray)
         
         plt.imshow(edges, cmap='gray')
