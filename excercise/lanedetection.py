@@ -142,9 +142,10 @@ class LaneDetection:
         img_file_name = os.path.basename(img_file_path)
         new_img_file_path = os.path.dirname(img_file_path) + '/' + os.path.splitext(img_file_name)[0] + '_withlane' + os.path.splitext(img_file_name)[1]
         self.save_image(final_img, new_img_file_path)
+        print "save to {}".format(new_img_file_path)
        
-        plt.imshow(final_img,cmap='gray' )
-        plt.show()
+#         plt.imshow(final_img,cmap='gray' )
+#         plt.show()
 
         
         return final_img
@@ -279,7 +280,9 @@ class LaneDetection:
                              'whiteCarLaneSwitch.jpg']
         img_file_paths = ['../test_images/'+ file_path for file_path in img_file_paths]
         for img_file_path in img_file_paths:
+            print "process image file {}".format(img_file_path)
             self.process_image_file_path(img_file_path)
+        print "Done with processing images"
 #             break
             
         
@@ -291,7 +294,7 @@ class LaneDetection:
         return
     def run(self):
 #         self.test_on_one_image('../test_images/solidYellowCurve.jpg')
-#         self.test_on_images()
+        self.test_on_images()
 #         self.test_on_videos('../solidWhiteRight.mp4','../white.mp4')
 #         self.test_on_videos('../solidYellowLeft.mp4','../yellow.mp4')
 #         self.test_on_videos('../challenge.mp4','../extra.mp4')
