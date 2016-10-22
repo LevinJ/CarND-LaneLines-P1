@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import math
 import os
+from moviepy.editor import VideoFileClip
 
 class LaneDetection:
     
@@ -53,7 +54,7 @@ class LaneDetection:
         #returning the image only where mask pixels are nonzero
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
-    def draw_lines(self, img, lines, color=[255, 0, 0], thickness=2):
+    def draw_lines(self, img, lines, color=[255, 0, 0], thickness=10):
         """
         NOTE: this is the function you might want to use as a starting point once you want to 
         average/extrapolate the line segments you detect to map out the full
@@ -70,6 +71,7 @@ class LaneDetection:
         If you want to make the lines semi-transparent, think about combining
         this function with the weighted_img() function below
         """
+        lines = self.extrapolate_lines(lines, img.shape[0])
         for line in lines:
             for x1,y1,x2,y2 in line:
                 cv2.line(img, (x1, y1), (x2, y2), color, thickness)
@@ -96,49 +98,134 @@ class LaneDetection:
         NOTE: initial_img and img must be the same shape!
         """
         return cv2.addWeighted(initial_img, a, img, b, lambda_param)
-    def process_image(self, img_file_path):
-        #load the image
-        initial_img = self.load_image(img_file_path)
-        plt.imshow(initial_img)
-
+    def process_image(self, initial_img):
         #get gray images
         gray_img = self.grayscale(initial_img)
-        plt.imshow(gray_img, cmap='gray')
+#         plt.imshow(gray_img, cmap='gray')
         #Guassian blur
         kernel_size = 5
         blur_img = self.gaussian_noise(gray_img, kernel_size)
-        plt.imshow(blur_img, cmap='gray')
+#         plt.imshow(blur_img, cmap='gray')
         #canny edge detection
         low_threshold = 50
         high_threshold = 150
         canny_edges = self.canny(blur_img, low_threshold, high_threshold)
-        plt.imshow(canny_edges, cmap='gray')
+#         plt.imshow(canny_edges, cmap='gray')
         
         #crop region of interest
-        vertices = np.array([[(10,539),(460,290), (480,290), (930,539)]], dtype=np.int32)
+        vertices = np.array([[(10,539),(460,320), (495,320), (930,539)]], dtype=np.int32)
         roi_img = self.region_of_interest(canny_edges, vertices)
+#         plt.imshow(roi_img, cmap='gray')
 
         #hough line detection
         rho = 1
         theta = np.pi/180
-        threshold = 3
-        min_line_len = 10
+        threshold = 2
+        min_line_len = 15
         max_line_gap = 5
         lines_img = self.hough_lines(roi_img, rho, theta, threshold, min_line_len, max_line_gap)
-        plt.imshow(lines_img, cmap='gray')
+#         plt.imshow(lines_img, cmap='gray')
 
         #blendign the images
-        a = 0.7
-        b = 0.3
+        a = 0.8
+        b = 0.2
         lambda_param = 20
         final_img = self.weighted_img(lines_img, initial_img, a, b, lambda_param)
+        
+        return  final_img
+    def process_image_file_path(self, img_file_path):
+        #load the image
+        initial_img = self.load_image(img_file_path)
+        plt.imshow(initial_img)
+        final_img = self.process_image(initial_img)
         plt.imshow(final_img)
         plt.show()
-        
         img_file_name = os.path.basename(img_file_path)
         new_img_file_path = os.path.dirname(img_file_path) + '/' + os.path.splitext(img_file_name)[0] + '_withlane' + os.path.splitext(img_file_name)[1]
         self.save_image(final_img, new_img_file_path)
-        return
+
+        
+        return final_img
+    def extrapolate_lines(self, lines, y_bottom):
+        left_lines = []
+        right_lines = []
+        for line in lines:
+            for x1,y1,x2,y2 in line:
+                k = (y2-y1)/float((x2-x1))
+                if k > 0:
+                    left_lines.append((x1,y1,x2,y2))
+                if k < 0:
+                    right_lines.append((x1,y1,x2,y2))
+            
+        left_line = self.extrapolate_one_lane(left_lines, y_bottom)  
+        right_line = self.extrapolate_one_lane(right_lines, y_bottom)
+        twolines = np.concatenate((left_line, right_line))[np.newaxis,:]
+        return twolines
+    def extrapolate_one_lane(self,lines, y_bottom):
+#         res = self.extend2_top_bottom(lines, y_bottom)
+        res = self.connect_top_bottom(lines, y_bottom)
+        return res
+    def connect_top_bottom(self,lines, y_bottom):
+        lines = np.array(lines)
+        
+        x1 = lines[:,0]
+        y1 = lines[:,1]
+        x2 = lines[:,2]
+        y2 = lines[:,3]
+        y_top = min(y1.min(), y2.min())
+        k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
+        x_min = min(x1.min(), x2.min())
+        x_max = max(x1.max(), x2.max())
+        #get x_top
+        if k_average < 0:
+            x_top = x_max
+        else:
+            x_top = x_min
+        x_bottom  = int((y_bottom - y_top)/k_average + x_top) 
+            
+        res = np.array((x_bottom, y_bottom, x_top, y_top))[np.newaxis,:]
+        return res
+    def extend2_top_bottom(self,lines, y_bottom):
+        #Each line extend to both bottom and top
+        lines = np.array(lines)
+        
+        x1 = lines[:,0]
+        y1 = lines[:,1]
+        x2 = lines[:,2]
+        y2 = lines[:,3]
+        y_top = min(y1.min(), y2.min())
+        k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
+        
+        res = lines.copy()
+        for line in lines:
+            extended_lines = self.extrapolate_one_line(line, y_bottom, y_top, k_average)
+            res = np.concatenate((res, extended_lines))
+        return res
+    def extrapolate_one_line(self, line, y_bottom, y_top, k_average):
+        x1,y1,x2,y2 = line
+        res = []
+        
+        if y1 < y2:
+            x_near_top = x1
+            y_near_top = y1
+            x_near_bottom = x2
+            y_near_bottom = y2
+        else:
+            x_near_top = x2
+            y_near_top = y2
+            x_near_bottom = x1
+            y_near_bottom = y1
+        
+        x_bottom  = int((y_bottom - y_near_bottom)/k_average + x_near_bottom)
+        x_top  = int((y_top - y_near_top)/k_average + x_near_top)
+        
+        to_top_line = [x_near_top, y_near_top, x_top, y_top]
+        to_bottom_line = [x_near_bottom, y_near_bottom, x_bottom, y_bottom]
+        res.append(to_top_line)
+        res.append(to_bottom_line)
+             
+        return np.array(res)
+    
     def test_on_images(self):
         img_file_paths = ['solidWhiteCurve.jpg',
                              'solidWhiteRight.jpg',
@@ -149,15 +236,21 @@ class LaneDetection:
         img_file_paths = ['../test_images/'+ file_path for file_path in img_file_paths]
         for img_file_path in img_file_paths:
             self.process_image(img_file_path)
-            break
+#             break
+            
         
         return
+    def test_on_videos(self, input_video, output_video):
+        clip1 = VideoFileClip(input_video)
+        white_clip = clip1.fl_image(self.process_image)
+        white_clip.write_videofile(output_video, audio=False)
+        return
     def run(self):
-        self.test_on_images()
-#         image_path = r'../test_images/solidWhiteRight.jpg'
-#         image = self.load_image(image_path)
-        
-#         plt.imshow(image)  #call as plt.imshow(gray, cmap='gray') to show a grayscaled image
+#         self.test_on_images()
+#         self.test_on_videos('../solidWhiteRight.mp4','../white.mp4')
+#         self.test_on_videos('../solidYellowLeft.mp4','../yellow.mp4')
+        self.test_on_videos('../challenge.mp4','../extra.mp4')
+
         plt.show()
         
         return
