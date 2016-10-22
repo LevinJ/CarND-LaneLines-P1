@@ -54,7 +54,7 @@ class LaneDetection:
         #returning the image only where mask pixels are nonzero
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
-    def draw_lines(self, img, lines, color=[255, 0, 0], thickness=10):
+    def draw_lines(self, img, lines, color=[255, 0, 0], thickness=8):
         """
         NOTE: this is the function you might want to use as a starting point once you want to 
         average/extrapolate the line segments you detect to map out the full
@@ -115,7 +115,7 @@ class LaneDetection:
         #crop region of interest
         vertices = np.array([[(10,539),(460,320), (495,320), (930,539)]], dtype=np.int32)
         roi_img = self.region_of_interest(canny_edges, vertices)
-#         plt.imshow(roi_img, cmap='gray')
+        plt.imshow(roi_img, cmap='gray')
 
         #hough line detection
         rho = 1
@@ -124,7 +124,7 @@ class LaneDetection:
         min_line_len = 15
         max_line_gap = 5
         lines_img = self.hough_lines(roi_img, rho, theta, threshold, min_line_len, max_line_gap)
-#         plt.imshow(lines_img, cmap='gray')
+        plt.imshow(lines_img, cmap='gray')
 
         #blendign the images
         a = 0.8
@@ -136,72 +136,93 @@ class LaneDetection:
     def process_image_file_path(self, img_file_path):
         #load the image
         initial_img = self.load_image(img_file_path)
-        plt.imshow(initial_img)
+#         plt.imshow(initial_img)
         final_img = self.process_image(initial_img)
-        plt.imshow(final_img)
-        plt.show()
+
         img_file_name = os.path.basename(img_file_path)
         new_img_file_path = os.path.dirname(img_file_path) + '/' + os.path.splitext(img_file_name)[0] + '_withlane' + os.path.splitext(img_file_name)[1]
         self.save_image(final_img, new_img_file_path)
+       
+        plt.imshow(final_img,cmap='gray' )
+        plt.show()
 
         
         return final_img
     def extrapolate_lines(self, lines, y_bottom):
         left_lines = []
         right_lines = []
+        y_top = 1000
         for line in lines:
             for x1,y1,x2,y2 in line:
+                y_min = min(y1, y2)
+                y_top = min(y_top, y_min)
                 k = (y2-y1)/float((x2-x1))
-                if k > 0:
-                    left_lines.append((x1,y1,x2,y2))
                 if k < 0:
+                    left_lines.append((x1,y1,x2,y2))
+                if k > 0:
                     right_lines.append((x1,y1,x2,y2))
             
-        left_line = self.extrapolate_one_lane(left_lines, y_bottom)  
-        right_line = self.extrapolate_one_lane(right_lines, y_bottom)
+        left_line = self.extrapolate_one_lane(left_lines, y_bottom, y_top)  
+        right_line = self.extrapolate_one_lane(right_lines, y_bottom, y_top)
+        
         twolines = np.concatenate((left_line, right_line))[np.newaxis,:]
         return twolines
-    def extrapolate_one_lane(self,lines, y_bottom):
-#         res = self.extend2_top_bottom(lines, y_bottom)
-        res = self.connect_top_bottom(lines, y_bottom)
+    def extrapolate_one_lane(self,lines, y_bottom, y_top):
+        res = self.extend2_top_bottom(lines, y_bottom, y_top)
+        #         res = self.connect_top_bottom(lines, y_bottom)     
         return res
-    def connect_top_bottom(self,lines, y_bottom):
-        lines = np.array(lines)
-        
+    def filter_outlier_lines(self, lines):
         x1 = lines[:,0]
         y1 = lines[:,1]
         x2 = lines[:,2]
         y2 = lines[:,3]
-        y_top = min(y1.min(), y2.min())
-        k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
-        x_min = min(x1.min(), x2.min())
-        x_max = max(x1.max(), x2.max())
-        #get x_top
-        if k_average < 0:
-            x_top = x_max
-        else:
-            x_top = x_min
-        x_bottom  = int((y_bottom - y_top)/k_average + x_top) 
-            
-        res = np.array((x_bottom, y_bottom, x_top, y_top))[np.newaxis,:]
-        return res
-    def extend2_top_bottom(self,lines, y_bottom):
+        
+#         line_length = np.sqrt((y2-y1)**2 + (x2-x1)**2)
+        # if the line segment is less than a certain amout, we ignore it.
+        #This is to avoid extending some noise line segments
+#         lines = lines[line_length > 15]
+       
+        
+        #filter those line segments that that very different slope
+        k = ((y2-y1)/(x2-x1).astype(np.float32))
+        q75, q25,k_median = np.percentile(k, [75 ,25,50])
+        iqr = q75 - q25
+        #here outlieris 1.5 * irq away from the median
+        lines = lines[abs((k-k_median)) < 0.2]
+#         k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
+#         lines = lines[(k - k_average) > 0.5]
+        
+      
+        return lines
+    def extend2_top_bottom(self,lines, y_bottom, y_top):
         #Each line extend to both bottom and top
         lines = np.array(lines)
+        res = lines.copy()
+        lines = self.filter_outlier_lines(lines)
+#         if filtered_lines.size ==0:
+#             return res
         
+        
+        
+        #reinitalize 
         x1 = lines[:,0]
         y1 = lines[:,1]
         x2 = lines[:,2]
         y2 = lines[:,3]
-        y_top = min(y1.min(), y2.min())
+        
+        
+        
+#         y_top = min(y1.min(), y2.min())
         k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
         
-        res = lines.copy()
+        
         for line in lines:
             extended_lines = self.extrapolate_one_line(line, y_bottom, y_top, k_average)
-            res = np.concatenate((res, extended_lines))
+            if not extended_lines is None:
+                res = np.concatenate((res, extended_lines))
         return res
     def extrapolate_one_line(self, line, y_bottom, y_top, k_average):
+        #return two lines, one to the top, the other to the bottom
         x1,y1,x2,y2 = line
         res = []
         
@@ -225,7 +246,30 @@ class LaneDetection:
         res.append(to_bottom_line)
              
         return np.array(res)
-    
+    def connect_top_bottom(self,lines, y_bottom):
+        lines = np.array(lines)
+        
+        x1 = lines[:,0]
+        y1 = lines[:,1]
+        x2 = lines[:,2]
+        y2 = lines[:,3]
+        
+        y_top = min(y1.min(), y2.min())
+        k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
+        x_min = min(x1.min(), x2.min())
+        x_max = max(x1.max(), x2.max())
+        #get x_top
+        if k_average < 0:
+            x_top = x_max
+        else:
+            x_top = x_min
+        x_bottom  = int((y_bottom - y_top)/k_average + x_top) 
+            
+        res = np.array((x_bottom, y_bottom, x_top, y_top))[np.newaxis,:]
+        return res
+    def test_on_one_image(self, img_file_path):
+        self.process_image_file_path(img_file_path)
+        return
     def test_on_images(self):
         img_file_paths = ['solidWhiteCurve.jpg',
                              'solidWhiteRight.jpg',
@@ -235,7 +279,7 @@ class LaneDetection:
                              'whiteCarLaneSwitch.jpg']
         img_file_paths = ['../test_images/'+ file_path for file_path in img_file_paths]
         for img_file_path in img_file_paths:
-            self.process_image(img_file_path)
+            self.process_image_file_path(img_file_path)
 #             break
             
         
@@ -246,10 +290,11 @@ class LaneDetection:
         white_clip.write_videofile(output_video, audio=False)
         return
     def run(self):
+#         self.test_on_one_image('../test_images/solidYellowCurve.jpg')
 #         self.test_on_images()
 #         self.test_on_videos('../solidWhiteRight.mp4','../white.mp4')
 #         self.test_on_videos('../solidYellowLeft.mp4','../yellow.mp4')
-        self.test_on_videos('../challenge.mp4','../extra.mp4')
+#         self.test_on_videos('../challenge.mp4','../extra.mp4')
 
         plt.show()
         
