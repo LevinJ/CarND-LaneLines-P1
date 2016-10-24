@@ -120,7 +120,7 @@ class LaneDetection:
         #hough line detection
         rho = 1
         theta = np.pi/180
-        threshold = 2
+        threshold = 30
         min_line_len = 15
         max_line_gap = 5
         lines_img = self.hough_lines(roi_img, rho, theta, threshold, min_line_len, max_line_gap)
@@ -294,9 +294,9 @@ class LaneDetection:
         return
     def run(self):
 #         self.test_on_one_image('../test_images/solidYellowCurve.jpg')
-        self.test_on_images()
+#         self.test_on_images()
 #         self.test_on_videos('../solidWhiteRight.mp4','../white.mp4')
-#         self.test_on_videos('../solidYellowLeft.mp4','../yellow.mp4')
+        self.test_on_videos('../solidYellowLeft.mp4','../yellow.mp4')
 #         self.test_on_videos('../challenge.mp4','../extra.mp4')
 
         plt.show()
