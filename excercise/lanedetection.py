@@ -9,6 +9,13 @@ from moviepy.editor import VideoFileClip
 class LaneDetection:
     
     def __init__(self):
+        #vetrices for region of interest
+        self.vertices = np.array([[(10,539),(460,320), (495,320), (930,539)]], dtype=np.int32)
+        self.low_threshold = 50
+        self.high_threshold = 150
+        self.min_line_len = 15
+        self.max_line_gap = 5
+        self.threshold = 30
         return
     def load_image(self, image_path):
         #reading in an image
@@ -71,6 +78,8 @@ class LaneDetection:
         If you want to make the lines semi-transparent, think about combining
         this function with the weighted_img() function below
         """
+        if lines is None:
+            return
         lines = self.extrapolate_lines(lines, img.shape[0])
         for line in lines:
             for x1,y1,x2,y2 in line:
@@ -98,6 +107,8 @@ class LaneDetection:
         NOTE: initial_img and img must be the same shape!
         """
         return cv2.addWeighted(initial_img, a, img, b, lambda_param)
+    def visualize_roi(self, lines_img):
+        return lines_img
     def process_image(self, initial_img):
         #get gray images
         gray_img = self.grayscale(initial_img)
@@ -107,25 +118,24 @@ class LaneDetection:
         blur_img = self.gaussian_noise(gray_img, kernel_size)
 #         plt.imshow(blur_img, cmap='gray')
         #canny edge detection
-        low_threshold = 50
-        high_threshold = 150
-        canny_edges = self.canny(blur_img, low_threshold, high_threshold)
-#         plt.imshow(canny_edges, cmap='gray')
+        
+        canny_edges = self.canny(blur_img, self.low_threshold, self.high_threshold)
+        plt.imshow(canny_edges, cmap='gray')
         
         #crop region of interest
-        vertices = np.array([[(10,539),(460,320), (495,320), (930,539)]], dtype=np.int32)
-        roi_img = self.region_of_interest(canny_edges, vertices)
+        
+        roi_img = self.region_of_interest(canny_edges, self.vertices)
         plt.imshow(roi_img, cmap='gray')
 
         #hough line detection
         rho = 1
         theta = np.pi/180
-        threshold = 30
-        min_line_len = 15
-        max_line_gap = 5
-        lines_img = self.hough_lines(roi_img, rho, theta, threshold, min_line_len, max_line_gap)
+        
+        
+        lines_img = self.hough_lines(roi_img, rho, theta, self.threshold, self.min_line_len, self.max_line_gap)
         plt.imshow(lines_img, cmap='gray')
-
+        
+        lines_img = self.visualize_roi(lines_img)
         #blendign the images
         a = 0.8
         b = 0.2
@@ -144,7 +154,7 @@ class LaneDetection:
         self.save_image(final_img, new_img_file_path)
         print "save to {}".format(new_img_file_path)
        
-#         plt.imshow(final_img,cmap='gray' )
+        plt.imshow(final_img )
 #         plt.show()
 
         
@@ -198,12 +208,15 @@ class LaneDetection:
     def extend2_top_bottom(self,lines, y_bottom, y_top):
         #Each line extend to both bottom and top
         lines = np.array(lines)
-        res = lines.copy()
+        if lines.size ==0:
+            res = np.array([],dtype=np.int64).reshape(0,4)
+            return res
+        
         lines = self.filter_outlier_lines(lines)
-#         if filtered_lines.size ==0:
-#             return res
+        res = lines.copy()
+
         
-        
+
         
         #reinitalize 
         x1 = lines[:,0]
@@ -295,7 +308,7 @@ class LaneDetection:
     def run(self):
 #         self.test_on_one_image('../test_images/solidYellowCurve.jpg')
 #         self.test_on_images()
-#         self.test_on_videos('../solidWhiteRight.mp4','../white.mp4')
+        self.test_on_videos('../solidWhiteRight.mp4','../white.mp4')
         self.test_on_videos('../solidYellowLeft.mp4','../yellow.mp4')
 #         self.test_on_videos('../challenge.mp4','../extra.mp4')
 
