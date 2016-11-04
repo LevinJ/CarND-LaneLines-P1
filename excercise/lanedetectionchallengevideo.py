@@ -38,7 +38,32 @@ class LaneDetectionChallenge(LaneDetection):
         
         twolines = np.concatenate((left_line, right_line))[np.newaxis,:]
         return twolines
-   
+    def get_weighted_average_line_equation(self, lines):
+        res = lines.copy()
+
+        x1 = lines[:,0]
+        y1 = lines[:,1]
+        x2 = lines[:,2]
+        y2 = lines[:,3]
+        
+        len = np.sqrt((y2-y1) **2 + (x2-x1)**2)
+        weights = len/len.sum()
+        k = (y2 - y1)/(x2 - x1).astype(np.float32)
+        b = (y2 - k * x2).astype(np.float32)
+        return (k*weights).sum(), (b*weights).sum()
+#         return k.mean(), b.mean()
+    def extend2_top_bottom_lines(self, lines, y_bottom, y_top):
+        k, b = self.get_weighted_average_line_equation(lines)
+        print 'k_mean {} b_mean {}'.format(k,b)
+        
+        x_bottom = int((y_bottom - b)/k)
+        x_top = int((y_top - b)/k)
+        res = np.array([x_bottom, y_bottom, x_top,y_top])[np.newaxis,:]
+#         for line in lines:
+#             extended_lines = self.extrapolate_one_line(line, y_bottom, y_top, k)
+#             if not extended_lines is None:
+#                 res = np.concatenate((res, extended_lines))
+        return res
     def filter_outlier_lines(self, lines):
         x1 = lines[:,0]
         y1 = lines[:,1]
@@ -49,8 +74,9 @@ class LaneDetectionChallenge(LaneDetection):
        
         
         #filter those lines are near horiztal
-        print abs(k)
+        print "K value before filtering" , abs(k)
         lines = lines[abs(k) > 0.5]     
+        print "lines after filtering" , lines
         return lines
     def format_coord(self, x, y):
         pt = self.hsv_img[y, x, :]
@@ -64,10 +90,11 @@ class LaneDetectionChallenge(LaneDetection):
         res_img = img.copy()
         res_img[mask == 255] = [255,255,255] 
         
-        self.hsv_img = hsv_img # for the purpose of showing hsv value
-        _, ax = plt.subplots()
-        ax.format_coord = self.format_coord
-        ax.imshow(img)
+        # for the purpose of showing hsv value
+#         self.hsv_img = hsv_img 
+#         _, ax = plt.subplots()
+#         ax.format_coord = self.format_coord
+#         ax.imshow(img)
         return res_img
     def visualize_roi(self, lines_img):
 #         color = [0, 255, 0]
@@ -90,7 +117,7 @@ class LaneDetectionChallenge(LaneDetection):
         return
     def run(self):
 #         self.test_hsv()
-#         self.test_on_one_image('../test_images/challenge_yellow.JPG')
+#         self.test_on_one_image('../test_images/challenge_125.jpg')
 #         self.test_on_one_image('../test_images/challenge_video_frame.jpg')
 #         plt.show()
         self.test_on_videos('../challenge.mp4','../extra.mp4')

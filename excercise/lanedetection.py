@@ -211,26 +211,13 @@ class LaneDetection:
         
       
         return lines
-    def extend2_top_bottom(self,lines, y_bottom, y_top):
-        #Each line extend to both bottom and top
-        lines = np.array(lines)
-        if lines.size ==0:
-            res = np.array([],dtype=np.int64).reshape(0,4)
-            return res
-        
-        lines = self.filter_outlier_lines(lines)
+    def extend2_top_bottom_lines(self, lines, y_bottom, y_top):
         res = lines.copy()
 
-        
-
-        
-        #reinitalize 
         x1 = lines[:,0]
         y1 = lines[:,1]
         x2 = lines[:,2]
         y2 = lines[:,3]
-        
-        
         
 #         y_top = min(y1.min(), y2.min())
         k_average = ((y2-y1)/(x2-x1).astype(np.float32)).mean()
@@ -241,6 +228,20 @@ class LaneDetection:
             if not extended_lines is None:
                 res = np.concatenate((res, extended_lines))
         return res
+    def extend2_top_bottom(self,lines, y_bottom, y_top):
+        #Each line extend to both bottom and top
+        lines = np.array(lines)
+        if lines.size ==0:
+            res = np.array([],dtype=np.int64).reshape(0,4)
+            return res
+        
+        lines = self.filter_outlier_lines(lines)
+        
+        if lines.size ==0:
+            res = np.array([],dtype=np.int64).reshape(0,4)
+            return res
+        
+        return self.extend2_top_bottom_lines(lines, y_bottom, y_top)
     def extrapolate_one_line(self, line, y_bottom, y_top, k_average):
         #return two lines, one to the top, the other to the bottom
         x1,y1,x2,y2 = line
@@ -289,6 +290,7 @@ class LaneDetection:
         return res
     def test_on_one_image(self, img_file_path):
         self.process_image_file_path(img_file_path)
+        plt.show()
         return
     def test_on_images(self):
         img_file_paths = ['solidWhiteCurve.jpg',
