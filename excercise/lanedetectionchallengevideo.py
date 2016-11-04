@@ -20,6 +20,8 @@ class LaneDetectionChallenge(LaneDetection):
         self.max_line_gap = 5
         self.threshold = 30
         self.img_frame_id = 1
+        self.k_prev = None
+        self.b_prev = None
         return
     def extrapolate_lines(self, lines, y_bottom):
         left_lines = []
@@ -39,22 +41,33 @@ class LaneDetectionChallenge(LaneDetection):
         twolines = np.concatenate((left_line, right_line))[np.newaxis,:]
         return twolines
     def get_weighted_average_line_equation(self, lines):
-        res = lines.copy()
+#         res = lines.copy()
 
         x1 = lines[:,0]
         y1 = lines[:,1]
         x2 = lines[:,2]
         y2 = lines[:,3]
         
-        len = np.sqrt((y2-y1) **2 + (x2-x1)**2)
-        weights = len/len.sum()
+        line_len = np.sqrt((y2-y1) **2 + (x2-x1)**2)
+        weights = line_len/line_len.sum()
         k = (y2 - y1)/(x2 - x1).astype(np.float32)
         b = (y2 - k * x2).astype(np.float32)
         return (k*weights).sum(), (b*weights).sum()
 #         return k.mean(), b.mean()
+    def get_momentum_update(self,k, b):
+        if self.k_prev is None:
+            return k, b
+        alpha = 0.8
+        k = alpha * k + (1 - alpha) * self.k_prev
+        b = alpha * b + (1 - alpha) * self.k_prev
+        self.k_prev = k
+        self.k_prev = b
+        return k, b
     def extend2_top_bottom_lines(self, lines, y_bottom, y_top):
         k, b = self.get_weighted_average_line_equation(lines)
         print 'k_mean {} b_mean {}'.format(k,b)
+        k,b = self.get_momentum_update(k, b)
+        print 'momentum update: k_mean {} b_mean {}'.format(k,b)
         
         x_bottom = int((y_bottom - b)/k)
         x_top = int((y_top - b)/k)
