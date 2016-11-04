@@ -13,8 +13,9 @@ class LaneDetectionChallenge(LaneDetection):
     def __init__(self):
         LaneDetection.__init__(self)
         self.vertices = np.array([[(100,720),(580,450), (732,450), (1240,720)]], dtype=np.int32)
-        self.low_threshold = 30
-        self.high_threshold = 80
+        self.low_threshold = 50
+        self.high_threshold = 150
+        
         self.min_line_len = 60
         self.max_line_gap = 5
         self.threshold = 30
@@ -51,7 +52,23 @@ class LaneDetectionChallenge(LaneDetection):
         print abs(k)
         lines = lines[abs(k) > 0.5]     
         return lines
-
+    def format_coord(self, x, y):
+        pt = self.hsv_img[y, x, :]
+        return 'HSV value, x={:.0f}, y={:.0f}  [h={}, s={}, v={}]'.format(x, y, pt[0],pt[1],pt[2])
+    def yellowtowhite(self, img):
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV);
+         
+        lowerb = np.array([20, 100, 100], dtype=np.uint8)
+        upperb = np.array([30, 255, 255], dtype=np.uint8)
+        mask = cv2.inRange(hsv_img, lowerb, upperb)
+        res_img = img.copy()
+        res_img[mask == 255] = [255,255,255] 
+        
+        self.hsv_img = hsv_img # for the purpose of showing hsv value
+        _, ax = plt.subplots()
+        ax.format_coord = self.format_coord
+        ax.imshow(img)
+        return res_img
     def visualize_roi(self, lines_img):
 #         color = [0, 255, 0]
 #         thickness= 5
@@ -65,8 +82,15 @@ class LaneDetectionChallenge(LaneDetection):
 #             self.save_image(initial_img, '../test_images/challenge_125.jpg')
 #         plt.imshow(initial_img)    
 #         return initial_img
+    def test_hsv(self):
+        img = self.load_image('../data/challenge_yellow.JPG')
+#         plt.imshow(img)
+        self.yellowtowhite(img)
+        plt.show()
+        return
     def run(self):
-#         self.test_on_one_image('../test_images/challenge_125.jpg')
+#         self.test_hsv()
+#         self.test_on_one_image('../test_images/challenge_yellow.JPG')
 #         self.test_on_one_image('../test_images/challenge_video_frame.jpg')
 #         plt.show()
         self.test_on_videos('../challenge.mp4','../extra.mp4')

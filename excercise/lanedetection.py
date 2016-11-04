@@ -31,7 +31,7 @@ class LaneDetection:
         This will return an image with only one color channel
         but NOTE: to see the returned image as grayscale
         you should call plt.imshow(gray, cmap='gray')"""
-        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     def canny(self, img, low_threshold, high_threshold):
         """Applies the Canny transform"""
         return cv2.Canny(img, low_threshold, high_threshold)
@@ -109,10 +109,16 @@ class LaneDetection:
         return cv2.addWeighted(initial_img, a, img, b, lambda_param)
     def visualize_roi(self, lines_img):
         return lines_img
+    def yellowtowhite(self, img):
+        return img
     def process_image(self, initial_img):
+        #show initial image
+        plt.imshow(initial_img)
+        yellow_white_img = self.yellowtowhite(initial_img)
+        plt.imshow(yellow_white_img)
         #get gray images
-        gray_img = self.grayscale(initial_img)
-#         plt.imshow(gray_img, cmap='gray')
+        gray_img = self.grayscale(yellow_white_img)
+        plt.imshow(gray_img, cmap='gray')
         #Guassian blur
         kernel_size = 5
         blur_img = self.gaussian_noise(gray_img, kernel_size)
