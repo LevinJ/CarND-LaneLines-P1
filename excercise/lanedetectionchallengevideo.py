@@ -16,7 +16,7 @@ class LaneDetectionChallenge(LaneDetection):
         self.low_threshold = 50
         self.high_threshold = 150
         
-        self.min_line_len = 60
+        self.min_line_len = 45
         self.max_line_gap = 5
         self.threshold = 30
         self.img_frame_id = 1

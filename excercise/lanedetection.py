@@ -61,7 +61,7 @@ class LaneDetection:
         #returning the image only where mask pixels are nonzero
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
-    def draw_lines(self, img, lines, color=[255, 0, 0], thickness=8):
+    def draw_lines(self, img, lines, color=[255, 0, 0], thickness=10):
         """
         NOTE: this is the function you might want to use as a starting point once you want to 
         average/extrapolate the line segments you detect to map out the full
@@ -144,8 +144,8 @@ class LaneDetection:
         lines_img = self.visualize_roi(lines_img)
         #blendign the images
         a = 0.8
-        b = 0.2
-        lambda_param = 20
+        b = 1.0
+        lambda_param = 0
         final_img = self.weighted_img(lines_img, initial_img, a, b, lambda_param)
         
         return  final_img
